@@ -1,4 +1,6 @@
-﻿using Microsoft.AspNetCore.Builder;
+﻿using Audit.Core;
+using Audit.Mvc;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
@@ -17,6 +19,18 @@ namespace MongoDB.GenericRepository
         public Startup(IConfiguration configuration)
         {
             Configuration = configuration;
+
+            Audit.Core.Configuration.Setup()
+            .UseMongoDB(config => config
+                .ConnectionString(configuration.GetValue<string>("MongoDBConfig:ConnectionString"))
+                .Database(configuration.GetValue<string>("MongoDBConfig:AuditDatabase"))
+                .Collection(configuration.GetValue<string>("MongoDBConfig:AuditEventCollection")));
+
+            //Referenciando a aplicação cadastrada no Octopus
+            Audit.Core.Configuration.AddCustomAction(ActionType.OnEventSaving, scope =>
+            {
+                scope.SetCustomField("ApplicationId", "355a23b0542bb64cd36241241b838a22");
+            });
         }
 
         public IConfiguration Configuration { get; }
@@ -24,7 +38,7 @@ namespace MongoDB.GenericRepository
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
-            services.AddMvc().SetCompatibilityVersion(CompatibilityVersion.Version_2_2);
+            services.AddMvc(x => x.Filters.Add(new AuditAttribute())).SetCompatibilityVersion(CompatibilityVersion.Version_2_2);
             // Configure the persistence in another layer
             MongoDbPersistence.Configure();
             services.AddSwaggerGen(s =>
@@ -72,6 +86,17 @@ namespace MongoDB.GenericRepository
             services.AddScoped<IMongoContext, MongoContext>();
             services.AddScoped<IUnitOfWork, UnitOfWork>();
             services.AddScoped<IProductRepository, ProductRepository>();
+            services.AddScoped<Audit.MongoDB.Providers.MongoDataProvider>();
+            //services.AddScoped<Audit.MongoDB.Providers.MongoDataProvider>(x =>
+            //{
+            //    var mongoDataProvider = new Audit.MongoDB.Providers.MongoDataProvider(config => 
+            //        config
+            //            .ConnectionString(Configuration.GetValue<string>("MongoDBConfig:ConnectionString"))
+            //            .Database(Configuration.GetValue<string>("MongoDBConfig:AuditDatabase"))
+            //            .Collection(Configuration.GetValue<string>("MongoDBConfig:AuditEventCollection")));
+
+            //    return mongoDataProvider;
+            //});
         }
     }
 }

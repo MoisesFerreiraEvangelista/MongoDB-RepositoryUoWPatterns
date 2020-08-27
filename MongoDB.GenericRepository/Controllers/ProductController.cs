@@ -1,9 +1,11 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Audit.MongoDB.Providers;
+using Microsoft.AspNetCore.Mvc;
 using MongoDB.GenericRepository.Interfaces;
 using MongoDB.GenericRepository.Model;
 using MongoDB.GenericRepository.ViewModel;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace MongoDB.GenericRepository.Controllers
@@ -14,16 +16,25 @@ namespace MongoDB.GenericRepository.Controllers
     {
         private readonly IProductRepository _productRepository;
         private readonly IUnitOfWork _uow;
+        private readonly MongoDataProvider _mongoDataProvider;
 
-        public ProductController(IProductRepository productRepository, IUnitOfWork uow)
+        public ProductController(IProductRepository productRepository, IUnitOfWork uow, MongoDataProvider mongoDataProvider)
         {
             _productRepository = productRepository;
             _uow = uow;
+            _mongoDataProvider = mongoDataProvider;
+            _mongoDataProvider.Collection = "Event2";
         }
         
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Product>>> Get()
         {
+            var myEvents = _mongoDataProvider
+                                .QueryEvents()
+                                .Where(ev => ev.Environment.UserName == "moise")
+                                .OrderByDescending(o => o.EndDate)
+                                .ToList();
+
             var products = await _productRepository.GetAll();
             return Ok(products);
         }
